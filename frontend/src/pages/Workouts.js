@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 
 function Workouts() {
   const [workouts, setWorkouts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -16,15 +15,9 @@ function Workouts() {
     fetchWorkouts();
   }, []);
 
-  const fetchWorkouts = async () => {
-    try {
-      const response = await axios.get('/api/workouts');
-      setWorkouts(response.data);
-    } catch (error) {
-      console.error('Erreur:', error);
-    } finally {
-      setLoading(false);
-    }
+  const fetchWorkouts = () => {
+    const stored = localStorage.getItem('workouts');
+    setWorkouts(stored ? JSON.parse(stored) : []);
   };
 
   const handleChange = (e) => {
@@ -32,17 +25,15 @@ function Workouts() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    try {
-      await axios.post('/api/workouts', formData);
-      setFormData({ name: '', description: '', duration: '', date: '' });
-      setShowForm(false);
-      fetchWorkouts();
-    } catch (error) {
-      console.error('Erreur:', error);
-      alert('Erreur lors de l\'ajout du workout');
-    }
+    const workouts = JSON.parse(localStorage.getItem('workouts') || '[]');
+    const newWorkout = { ...formData, id: Date.now() };
+    workouts.push(newWorkout);
+    localStorage.setItem('workouts', JSON.stringify(workouts));
+    setFormData({ name: '', description: '', duration: '', date: '' });
+    setShowForm(false);
+    fetchWorkouts();
   };
 
   if (loading) return <div className="loading">Chargement...</div>;

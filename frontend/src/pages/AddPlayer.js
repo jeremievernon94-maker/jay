@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 
 function AddPlayer() {
   const navigate = useNavigate();
@@ -18,15 +17,13 @@ function AddPlayer() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    try {
-      await axios.post('/api/players', formData);
-      navigate('/');
-    } catch (error) {
-      console.error('Erreur:', error);
-      alert('Erreur lors de l\'ajout du joueur');
-    }
+    const players = JSON.parse(localStorage.getItem('players') || '[]');
+    const newPlayer = { ...formData, id: Date.now() };
+    players.push(newPlayer);
+    localStorage.setItem('players', JSON.stringify(players));
+    navigate('/');
   };
 
   return (

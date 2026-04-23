@@ -1,24 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
 
 function PlayersList() {
   const [players, setPlayers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchPlayers();
   }, []);
 
-  const fetchPlayers = async () => {
-    try {
-      const response = await axios.get('/api/players');
-      setPlayers(response.data);
-    } catch (error) {
-      console.error('Erreur:', error);
-    } finally {
-      setLoading(false);
-    }
+  const fetchPlayers = () => {
+    const stored = localStorage.getItem('players');
+    setPlayers(stored ? JSON.parse(stored) : []);
+    setLoading(false);
   };
 
   if (loading) return <div className="loading">Chargement...</div>;

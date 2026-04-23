@@ -1,25 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import axios from 'axios';
 
 function PlayerDetail() {
   const { id } = useParams();
   const [player, setPlayer] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchPlayer();
   }, [id]);
 
-  const fetchPlayer = async () => {
-    try {
-      const response = await axios.get(`/api/players/${id}`);
-      setPlayer(response.data);
-    } catch (error) {
-      console.error('Erreur:', error);
-    } finally {
-      setLoading(false);
-    }
+  const fetchPlayer = () => {
+    const players = JSON.parse(localStorage.getItem('players') || '[]');
+    const found = players.find(p => p.id == id);
+    setPlayer(found);
   };
 
   if (loading) return <div className="loading">Chargement...</div>;
