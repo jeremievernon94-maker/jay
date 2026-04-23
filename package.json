@@ -13,6 +13,6 @@
     "install": "npm install -w frontend && npm install -w backend"
   },
   "devDependencies": {
-    "concurrently": "^8.2.0"
+    "concurrently": "^8.2.2"
   }
 }
