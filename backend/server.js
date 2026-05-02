@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 const database = require('./db');
+const { questions } = require('./trivia');
 
 const app = express();
 app.use(cors());
@@ -44,6 +45,23 @@ app.post('/api/workouts', (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     res.status(201).json({ message: 'Workout added' });
   });
+});
+
+// ─── Trivia routes ────────────────────────────────────────────────────────────
+app.get('/api/trivia/questions', (req, res) => {
+  const { difficulty, category, limit } = req.query;
+  let filtered = [...questions];
+  if (difficulty) filtered = filtered.filter(q => q.difficulty === difficulty);
+  if (category) filtered = filtered.filter(q => q.category === category);
+  // shuffle
+  filtered.sort(() => Math.random() - 0.5);
+  if (limit) filtered = filtered.slice(0, parseInt(limit));
+  res.json(filtered);
+});
+
+app.get('/api/trivia/categories', (req, res) => {
+  const categories = [...new Set(questions.map(q => q.category))];
+  res.json(categories);
 });
 
 const PORT = process.env.PORT || 5000;

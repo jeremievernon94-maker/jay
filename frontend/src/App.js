@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import PlayersList from './pages/PlayersList';
 import PlayerDetail from './pages/PlayerDetail';
 import AddPlayer from './pages/AddPlayer';
 import Workouts from './pages/Workouts';
+import TriviaQuiz from './pages/TriviaQuiz';
 import './styles.css';
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
               <Link to="/" className="nav-link">Joueurs</Link>
               <Link to="/add-player" className="nav-link">+ Joueur</Link>
               <Link to="/workouts" className="nav-link">Entraînements</Link>
+              <Link to="/trivia" className="nav-link nav-link-trivia">🎯 Trivia Quiz</Link>
             </div>
           </div>
         </nav>
@@ -29,6 +31,7 @@ function App() {
             <Route path="/add-player" element={<AddPlayer />} />
             <Route path="/player/:id" element={<PlayerDetail />} />
             <Route path="/workouts" element={<Workouts />} />
+            <Route path="/trivia" element={<TriviaQuiz />} />
           </Routes>
         </div>
       </div>
