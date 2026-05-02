@@ -64,5 +64,9 @@ app.get('/api/trivia/categories', (req, res) => {
   res.json(categories);
 });
 
+app.get('/download', (req, res) => {
+  res.download('/tmp/basketball-trivia-quiz.zip', 'basketball-trivia-quiz.zip');
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
