@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 
 const DIFFICULTIES = [
@@ -15,8 +15,7 @@ const CATEGORIES = [
   { key: 'EuroLeague', label: 'EuroLeague', icon: '🇪🇺' },
 ];
 
-const TEAM_COLORS = ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c'];
-
+const TEAM_COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c'];
 const TIMER_SECONDS = 30;
 
 // ─── Setup screen ─────────────────────────────────────────────────────────────
@@ -30,12 +29,15 @@ function SetupScreen({ onStart }) {
   const toggleCategory = (key) => {
     if (key === 'all') { setSelectedCategories(['all']); return; }
     const next = selectedCategories.filter(c => c !== 'all');
-    setSelectedCategories(next.includes(key) ? next.filter(c => c !== key) : [...next, key]);
+    const updated = next.includes(key) ? next.filter(c => c !== key) : [...next, key];
+    setSelectedCategories(updated.length === 0 ? ['all'] : updated);
   };
 
   const toggleDifficulty = (key) => {
     setDifficulties(prev =>
-      prev.includes(key) ? (prev.length > 1 ? prev.filter(d => d !== key) : prev) : [...prev, key]
+      prev.includes(key)
+        ? prev.length > 1 ? prev.filter(d => d !== key) : prev
+        : [...prev, key]
     );
   };
 
@@ -60,7 +62,6 @@ function SetupScreen({ onStart }) {
       </div>
 
       <div className="setup-grid">
-        {/* Teams */}
         <div className="setup-card">
           <h2>👥 Équipes</h2>
           <div className="team-count-selector">
@@ -93,7 +94,6 @@ function SetupScreen({ onStart }) {
           </div>
         </div>
 
-        {/* Questions per turn */}
         <div className="setup-card">
           <h2>❓ Questions par manche</h2>
           <div className="qpt-selector">
@@ -114,7 +114,9 @@ function SetupScreen({ onStart }) {
               <button
                 key={d.key}
                 className={`diff-toggle ${difficulties.includes(d.key) ? 'active' : ''}`}
-                style={difficulties.includes(d.key) ? { borderColor: d.color, background: d.color + '22' } : {}}
+                style={difficulties.includes(d.key)
+                  ? { borderColor: d.color, background: d.color + '22' }
+                  : {}}
                 onClick={() => toggleDifficulty(d.key)}
               >
                 {d.icon} {d.label} <span className="pts">+{d.points}pts</span>
@@ -123,7 +125,6 @@ function SetupScreen({ onStart }) {
           </div>
         </div>
 
-        {/* Categories */}
         <div className="setup-card full-width">
           <h2>🏆 Catégories</h2>
           <div className="category-toggles">
@@ -151,77 +152,89 @@ function SetupScreen({ onStart }) {
 function GameScreen({ config, onEnd }) {
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [usedIds, setUsedIds] = useState(new Set());
   const [currentTeamIdx, setCurrentTeamIdx] = useState(0);
   const [currentQIdx, setCurrentQIdx] = useState(0);
   const [teams, setTeams] = useState(config.teams);
   const [selected, setSelected] = useState(null);
   const [revealed, setRevealed] = useState(false);
   const [timer, setTimer] = useState(TIMER_SECONDS);
-  const [phase, setPhase] = useState('question'); // 'question' | 'transition'
-  const [roundScores, setRoundScores] = useState([]);
-  const [usedIds, setUsedIds] = useState(new Set());
+  const [phase, setPhase] = useState('question');
+  const [gameOver, setGameOver] = useState(false);
 
-  const fetchQuestions = useCallback(async (cats, diffs, count) => {
-    try {
-      const params = new URLSearchParams();
-      if (count) params.append('limit', count);
-      const res = await axios.get(`/api/trivia/questions?${params}`);
-      let pool = res.data;
-      if (!cats.includes('all')) pool = pool.filter(q => cats.includes(q.category));
-      pool = pool.filter(q => diffs.includes(q.difficulty));
-      pool.sort(() => Math.random() - 0.5);
-      return pool;
-    } catch {
-      return [];
-    }
-  }, []);
+  // Use ref so timer callback always sees latest teams/question
+  const stateRef = useRef({});
+  stateRef.current = { revealed, phase, loading, teams, currentTeamIdx, currentQIdx, usedIds, questions, gameOver };
 
+  // Load questions once
   useEffect(() => {
     const load = async () => {
-      const pool = await fetchQuestions(
-        config.selectedCategories,
-        config.difficulties,
-        config.questionsPerTurn * config.teams.length * 3
-      );
-      setQuestions(pool);
+      try {
+        const res = await axios.get('/api/trivia/questions');
+        let pool = res.data;
+        if (!config.selectedCategories.includes('all')) {
+          pool = pool.filter(q => config.selectedCategories.includes(q.category));
+        }
+        pool = pool.filter(q => config.difficulties.includes(q.difficulty));
+        pool.sort(() => Math.random() - 0.5);
+        setQuestions(pool);
+      } catch (err) {
+        console.error('Failed to load questions', err);
+      }
       setLoading(false);
     };
     load();
-  }, [config, fetchQuestions]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Pick next unplayed question
-  const nextQuestion = useCallback((currentUsed) => {
-    return questions.find(q => !currentUsed.has(q.id)) || null;
-  }, [questions]);
+  // Derive current question from state
+  const currentQuestion = questions.find(q => !usedIds.has(q.id)) || null;
 
-  const currentQuestion = questions.filter(q => !usedIds.has(q.id))[0] || null;
-
-  // Timer
+  // Trigger game over via effect (never during render)
   useEffect(() => {
-    if (loading || revealed || phase !== 'question') return;
-    if (timer <= 0) { handleReveal(null); return; }
+    if (!loading && !gameOver && questions.length > 0 && !currentQuestion) {
+      setGameOver(true);
+    }
+  }, [loading, gameOver, questions, currentQuestion]);
+
+  useEffect(() => {
+    if (gameOver) onEnd(teams);
+  }, [gameOver]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Timer — only tick when active
+  useEffect(() => {
+    if (loading || revealed || phase !== 'question' || gameOver) return;
+    if (timer <= 0) {
+      // Time's up — auto-reveal with no answer
+      handleReveal(null);
+      return;
+    }
     const t = setTimeout(() => setTimer(prev => prev - 1), 1000);
     return () => clearTimeout(t);
-  });
+  }, [timer, loading, revealed, phase, gameOver]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleReveal = (option) => {
-    if (revealed) return;
+  const handleReveal = useCallback((option) => {
+    const { revealed: rev, currentQuestion: q } = {
+      revealed: stateRef.current.revealed,
+      currentQuestion: stateRef.current.questions.find(
+        q => !stateRef.current.usedIds.has(q.id)
+      ) || null,
+    };
+    if (rev || !q) return;
+
+    const isCorrect = option !== null && option === q.answer;
     setSelected(option);
     setRevealed(true);
-    const q = currentQuestion;
-    if (!q) return;
-    const isCorrect = option === q.answer;
-    setTeams(prev => prev.map((t, i) => i === currentTeamIdx ? {
-      ...t,
-      score: t.score + (isCorrect ? q.points : 0),
-      correct: t.correct + (isCorrect ? 1 : 0),
-      wrong: t.wrong + (isCorrect ? 0 : 1),
-    } : t));
-    setRoundScores(prev => [...prev, { teamId: currentTeamIdx, correct: isCorrect, points: isCorrect ? q.points : 0 }]);
-  };
+    setTeams(prev => prev.map((t, i) =>
+      i === stateRef.current.currentTeamIdx
+        ? { ...t, score: t.score + (isCorrect ? q.points : 0), correct: t.correct + (isCorrect ? 1 : 0), wrong: t.wrong + (isCorrect ? 0 : 1) }
+        : t
+    ));
+  }, []);
 
   const handleNext = () => {
     if (!currentQuestion) return;
+
+    // Mark question as used
     const newUsed = new Set(usedIds);
     newUsed.add(currentQuestion.id);
     setUsedIds(newUsed);
@@ -231,25 +244,23 @@ function GameScreen({ config, onEnd }) {
 
     const nextQIdx = currentQIdx + 1;
     if (nextQIdx >= config.questionsPerTurn) {
-      // next team
-      const nextTeam = (currentTeamIdx + 1) % teams.length;
-      if (nextTeam === 0 && currentTeamIdx === teams.length - 1) {
-        // all teams done one round — check if more questions
-        const remaining = questions.filter(q => !newUsed.has(q.id));
-        if (remaining.length < teams.length) {
-          onEnd(teams);
-          return;
-        }
+      // Check if this was the last team of the round
+      const nextTeamIdx = (currentTeamIdx + 1) % teams.length;
+      const isLastTeamOfRound = currentTeamIdx === teams.length - 1;
+      const remaining = questions.filter(q => !newUsed.has(q.id));
+
+      if (isLastTeamOfRound && remaining.length < teams.length) {
+        setGameOver(true);
+        return;
       }
-      setPhase('transition');
-      setCurrentTeamIdx(nextTeam);
+
+      setCurrentTeamIdx(nextTeamIdx);
       setCurrentQIdx(0);
+      setPhase('transition');
     } else {
       setCurrentQIdx(nextQIdx);
     }
   };
-
-  const handleTransitionDone = () => setPhase('question');
 
   if (loading) return (
     <div className="quiz-loading">
@@ -258,18 +269,18 @@ function GameScreen({ config, onEnd }) {
     </div>
   );
 
-  if (!currentQuestion && !loading) {
-    onEnd(teams);
-    return null;
-  }
+  if (gameOver) return null;
+
+  if (!currentQuestion) return (
+    <div className="quiz-loading"><p>Plus de questions disponibles.</p></div>
+  );
 
   if (phase === 'transition') {
     return (
       <TransitionScreen
         team={teams[currentTeamIdx]}
-        questionNumber={1}
         total={config.questionsPerTurn}
-        onReady={handleTransitionDone}
+        onReady={() => setPhase('question')}
       />
     );
   }
@@ -281,22 +292,25 @@ function GameScreen({ config, onEnd }) {
 
   return (
     <div className="quiz-game">
-      {/* Scoreboard */}
       <div className="scoreboard">
         {teams.map((t, i) => (
-          <div key={t.id} className={`score-chip ${i === currentTeamIdx ? 'active' : ''}`}
-               style={{ borderColor: t.color }}>
+          <div
+            key={t.id}
+            className={`score-chip ${i === currentTeamIdx ? 'active' : ''}`}
+            style={{ borderColor: t.color }}
+          >
             <span className="score-chip-name" style={{ color: t.color }}>{t.name}</span>
             <span className="score-chip-pts">{t.score} pts</span>
           </div>
         ))}
       </div>
 
-      {/* Question card */}
       <div className="question-card">
         <div className="question-meta">
           <span className="cat-badge">{cat?.icon} {q.category}</span>
-          <span className="diff-badge" style={{ background: diff?.color }}>{diff?.icon} {diff?.label}</span>
+          <span className="diff-badge" style={{ background: diff?.color }}>
+            {diff?.icon} {diff?.label}
+          </span>
           <span className="pts-badge">+{q.points} pts</span>
           <span className="q-counter">{currentQIdx + 1}/{config.questionsPerTurn}</span>
         </div>
@@ -305,12 +319,14 @@ function GameScreen({ config, onEnd }) {
           🏀 {teams[currentTeamIdx].name} joue
         </div>
 
-        {/* Timer bar */}
         <div className="timer-bar-wrap">
-          <div className="timer-bar" style={{
-            width: `${timerPct}%`,
-            background: timer > 10 ? '#27ae60' : '#e74c3c',
-          }} />
+          <div
+            className="timer-bar"
+            style={{
+              width: `${timerPct}%`,
+              background: timer > 10 ? '#27ae60' : '#e74c3c',
+            }}
+          />
           <span className="timer-text">{timer}s</span>
         </div>
 
@@ -325,7 +341,12 @@ function GameScreen({ config, onEnd }) {
               else cls += ' dimmed';
             }
             return (
-              <button key={opt} className={cls} onClick={() => handleReveal(opt)} disabled={revealed}>
+              <button
+                key={opt}
+                className={cls}
+                onClick={() => handleReveal(opt)}
+                disabled={revealed}
+              >
                 {opt}
               </button>
             );
@@ -334,9 +355,13 @@ function GameScreen({ config, onEnd }) {
 
         {revealed && (
           <div className={`feedback ${selected === q.answer ? 'feedback-correct' : 'feedback-wrong'}`}>
-            {selected === q.answer
-              ? `✅ Bonne réponse ! +${q.points} points pour ${teams[currentTeamIdx].name}`
-              : `❌ Mauvaise réponse. La bonne réponse était : ${q.answer}`}
+            <span>
+              {selected === q.answer
+                ? `✅ Bonne réponse ! +${q.points} points pour ${teams[currentTeamIdx].name}`
+                : selected === null
+                ? `⏱️ Temps écoulé ! La réponse était : ${q.answer}`
+                : `❌ Mauvaise réponse. La bonne réponse était : ${q.answer}`}
+            </span>
             <button className="next-btn" onClick={handleNext}>
               {currentQIdx + 1 >= config.questionsPerTurn && currentTeamIdx < teams.length - 1
                 ? `Passer à ${teams[(currentTeamIdx + 1) % teams.length].name} ➡️`
@@ -352,14 +377,16 @@ function GameScreen({ config, onEnd }) {
 }
 
 // ─── Transition screen ────────────────────────────────────────────────────────
-function TransitionScreen({ team, questionNumber, total, onReady }) {
+function TransitionScreen({ team, total, onReady }) {
   return (
     <div className="transition-screen" style={{ borderColor: team.color }}>
       <div className="transition-icon">🏀</div>
       <h2 style={{ color: team.color }}>C'est au tour de</h2>
       <h1 style={{ color: team.color }}>{team.name}</h1>
       <p>{total} questions vous attendent !</p>
-      <div className="team-score-display">Score actuel : <strong>{team.score} pts</strong></div>
+      <div className="team-score-display">
+        Score actuel : <strong>{team.score} pts</strong>
+      </div>
       <button className="ready-btn" style={{ background: team.color }} onClick={onReady}>
         Nous sommes prêts ! 🚀
       </button>
@@ -411,7 +438,7 @@ function ResultsScreen({ teams, onRestart }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function TriviaQuiz() {
-  const [screen, setScreen] = useState('setup'); // 'setup' | 'game' | 'results'
+  const [screen, setScreen] = useState('setup');
   const [config, setConfig] = useState(null);
   const [finalTeams, setFinalTeams] = useState([]);
 
