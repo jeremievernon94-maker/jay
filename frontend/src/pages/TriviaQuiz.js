@@ -184,7 +184,7 @@ function GameScreen({ config, onEnd }) {
       setLoading(false);
     };
     load();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // run once on mount
 
   // Derive current question from state
   const currentQuestion = questions.find(q => !usedIds.has(q.id)) || null;
@@ -198,7 +198,7 @@ function GameScreen({ config, onEnd }) {
 
   useEffect(() => {
     if (gameOver) onEnd(teams);
-  }, [gameOver]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [gameOver]); // onEnd/teams intentionally omitted — stable refs
 
   // Timer — only tick when active
   useEffect(() => {
@@ -210,7 +210,7 @@ function GameScreen({ config, onEnd }) {
     }
     const t = setTimeout(() => setTimer(prev => prev - 1), 1000);
     return () => clearTimeout(t);
-  }, [timer, loading, revealed, phase, gameOver]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [timer, loading, revealed, phase, gameOver]); // handleReveal via ref, no extra dep needed
 
   const handleReveal = useCallback((option) => {
     const { revealed: rev, currentQuestion: q } = {
