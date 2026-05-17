@@ -2,13 +2,12 @@ import React, { useState, useEffect } from 'react';
 
 function Workouts() {
   const [workouts, setWorkouts] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     duration: '',
-    date: ''
+    date: new Date().toISOString().split('T')[0]
   });
 
   useEffect(() => {
@@ -17,7 +16,8 @@ function Workouts() {
 
   const fetchWorkouts = () => {
     const stored = localStorage.getItem('workouts');
-    setWorkouts(stored ? JSON.parse(stored) : []);
+    const data = stored ? JSON.parse(stored) : [];
+    setWorkouts(data.sort((a, b) => new Date(b.date) - new Date(a.date)));
   };
 
   const handleChange = (e) => {
@@ -27,42 +27,51 @@ function Workouts() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    if (!formData.name.trim()) {
+      alert('Le nom est obligatoire');
+      return;
+    }
+
     const workouts = JSON.parse(localStorage.getItem('workouts') || '[]');
-    const newWorkout = { ...formData, id: Date.now() };
+    const newWorkout = {
+      ...formData,
+      id: Date.now(),
+      createdAt: new Date().toISOString()
+    };
     workouts.push(newWorkout);
     localStorage.setItem('workouts', JSON.stringify(workouts));
-    setFormData({ name: '', description: '', duration: '', date: '' });
+    setFormData({ name: '', description: '', duration: '', date: new Date().toISOString().split('T')[0] });
     setShowForm(false);
     fetchWorkouts();
   };
 
-  if (loading) return <div className="loading">Chargement...</div>;
+  const deleteWorkout = (id) => {
+    if (confirm('Supprimer cet entraînement?')) {
+      const workouts = JSON.parse(localStorage.getItem('workouts') || '[]');
+      const filtered = workouts.filter(w => w.id !== id);
+      localStorage.setItem('workouts', JSON.stringify(filtered));
+      fetchWorkouts();
+    }
+  };
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <h1 style={{ color: 'white' }}>Entraînements</h1>
-        <button
-          className="btn btn-primary"
-          onClick={() => setShowForm(!showForm)}
-        >
-          {showForm ? 'Annuler' : '+ Ajouter un Entraînement'}
-        </button>
-      </div>
+      <h1>⚙️ Entraînements</h1>
 
       {showForm && (
         <div className="card">
-          <h2 style={{ marginBottom: '1.5rem' }}>Créer un Entraînement</h2>
+          <h2 style={{ marginBottom: '1.5rem', fontSize: '1.3rem' }}>Nouveau Workout</h2>
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label>Nom *</label>
+              <label>Nom du workout *</label>
               <input
                 type="text"
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                required
                 placeholder="Ex: Tir à 3 points"
+                autoFocus
               />
             </div>
 
@@ -72,20 +81,21 @@ function Workouts() {
                 name="description"
                 value={formData.description}
                 onChange={handleChange}
-                placeholder="Détails de l'entraînement..."
-                rows="4"
+                placeholder="Détails, exercices..."
+                rows="3"
               />
             </div>
 
             <div className="form-row">
               <div className="form-group">
-                <label>Durée (minutes)</label>
+                <label>Durée (min)</label>
                 <input
                   type="number"
                   name="duration"
                   value={formData.duration}
                   onChange={handleChange}
                   placeholder="Ex: 60"
+                  min="0"
                 />
               </div>
               <div className="form-group">
@@ -100,41 +110,83 @@ function Workouts() {
               </div>
             </div>
 
-            <button type="submit" className="btn btn-primary">Créer l'Entraînement</button>
+            <button type="submit" className="btn btn-primary">
+              ✓ Créer Workout
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setShowForm(false)}
+              style={{ marginTop: '0.8rem', width: '100%' }}
+            >
+              Annuler
+            </button>
           </form>
         </div>
       )}
 
-      <div>
-        {workouts.length === 0 ? (
-          <div className="no-content">
-            <p>Aucun entraînement enregistré. Créez-en un !</p>
+      {!showForm && (
+        <button
+          onClick={() => setShowForm(true)}
+          className="btn btn-primary"
+          style={{ marginBottom: '1.5rem', width: '100%' }}
+        >
+          ➕ Nouveau Workout
+        </button>
+      )}
+
+      {workouts.length === 0 ? (
+        <div className="no-content">
+          <p style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>Aucun entraînement</p>
+          <p>Crée ton premier workout!</p>
+        </div>
+      ) : (
+        <>
+          <div style={{ marginBottom: '1rem', color: 'white', fontSize: '0.9rem' }}>
+            {workouts.length} workout{workouts.length > 1 ? 's' : ''}
           </div>
-        ) : (
           <div>
             {workouts.map(workout => (
               <div key={workout.id} className="workout-item">
-                <div className="workout-title">{workout.name}</div>
-                {workout.date && (
-                  <div className="workout-details">
-                    <strong>Date:</strong> {new Date(workout.date).toLocaleDateString('fr-FR')}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                  <div style={{ flex: 1 }}>
+                    <div className="workout-title">{workout.name}</div>
+                    {workout.date && (
+                      <div className="workout-details">
+                        <strong>📅</strong> {new Date(workout.date).toLocaleDateString('fr-FR')}
+                      </div>
+                    )}
+                    {workout.duration && (
+                      <div className="workout-details">
+                        <strong>⏱️</strong> {workout.duration} min
+                      </div>
+                    )}
+                    {workout.description && (
+                      <div className="workout-details" style={{ marginTop: '0.5rem' }}>
+                        {workout.description}
+                      </div>
+                    )}
                   </div>
-                )}
-                {workout.duration && (
-                  <div className="workout-details">
-                    <strong>Durée:</strong> {workout.duration} minutes
-                  </div>
-                )}
-                {workout.description && (
-                  <div className="workout-details">
-                    <strong>Description:</strong> {workout.description}
-                  </div>
-                )}
+                  <button
+                    onClick={() => deleteWorkout(workout.id)}
+                    style={{
+                      background: '#fee',
+                      border: 'none',
+                      color: '#c33',
+                      padding: '0.5rem 0.8rem',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '1.2rem'
+                    }}
+                  >
+                    🗑️
+                  </button>
+                </div>
               </div>
             ))}
           </div>
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 }

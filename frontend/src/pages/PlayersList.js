@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 
 function PlayersList() {
   const [players, setPlayers] = useState([]);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchPlayers();
@@ -12,45 +11,77 @@ function PlayersList() {
   const fetchPlayers = () => {
     const stored = localStorage.getItem('players');
     setPlayers(stored ? JSON.parse(stored) : []);
-    setLoading(false);
   };
 
-  if (loading) return <div className="loading">Chargement...</div>;
+  const formatAge = (birthDate) => {
+    if (!birthDate) return null;
+    const birth = new Date(birthDate);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) age--;
+    return age;
+  };
 
   return (
     <div>
-      <h1 style={{ color: 'white', marginBottom: '2rem' }}>Liste des Joueurs</h1>
+      <h1>👥 Mes Joueurs</h1>
+
       {players.length === 0 ? (
         <div className="no-content">
-          <p>Aucun joueur enregistré. Commencez par en ajouter un !</p>
+          <p style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>Aucun joueur pour le moment</p>
+          <p>Clique sur "Ajouter" pour commencer!</p>
         </div>
       ) : (
-        <div className="players-grid">
-          {players.map(player => (
-            <Link key={player.id} to={`/player/${player.id}`} style={{ textDecoration: 'none' }}>
-              <div className="player-card">
-                <div className="player-name">{player.name}</div>
-                <div className="player-info">
-                  <strong>Poste:</strong> {player.position || '-'}
+        <>
+          <div style={{ marginBottom: '1rem', color: 'white', fontSize: '0.9rem' }}>
+            {players.length} joueur{players.length > 1 ? 's' : ''}
+          </div>
+          <div className="players-grid">
+            {players.map(player => (
+              <Link key={player.id} to={`/player/${player.id}`} style={{ textDecoration: 'none' }}>
+                <div className="player-card">
+                  <div className="player-name">{player.name}</div>
+
+                  {player.position && (
+                    <div className="player-info">
+                      <strong>Poste</strong>
+                      <span>{player.position}</span>
+                    </div>
+                  )}
+
+                  {player.club && (
+                    <div className="player-info">
+                      <strong>Club</strong>
+                      <span>{player.club}</span>
+                    </div>
+                  )}
+
+                  {player.height && (
+                    <div className="player-info">
+                      <strong>Taille</strong>
+                      <span>{player.height}cm</span>
+                    </div>
+                  )}
+
+                  {player.weight && (
+                    <div className="player-info">
+                      <strong>Poids</strong>
+                      <span>{player.weight}kg</span>
+                    </div>
+                  )}
+
+                  {formatAge(player.birthDate) && (
+                    <div className="player-info">
+                      <strong>Âge</strong>
+                      <span>{formatAge(player.birthDate)} ans</span>
+                    </div>
+                  )}
                 </div>
-                <div className="player-info">
-                  <strong>Club:</strong> {player.club || '-'}
-                </div>
-                <div className="player-info">
-                  <strong>Taille:</strong> {player.height ? `${player.height}cm` : '-'}
-                </div>
-                <div className="player-info">
-                  <strong>Poids:</strong> {player.weight ? `${player.weight}kg` : '-'}
-                </div>
-                {player.birthDate && (
-                  <div className="player-info">
-                    <strong>Naissance:</strong> {player.birthDate}
-                  </div>
-                )}
-              </div>
-            </Link>
-          ))}
-        </div>
+              </Link>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

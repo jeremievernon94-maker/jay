@@ -11,16 +11,28 @@ function AddPlayer() {
     club: '',
     birthDate: ''
   });
+  const [error, setError] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    setError('');
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    if (!formData.name.trim()) {
+      setError('Le nom est obligatoire');
+      return;
+    }
+
     const players = JSON.parse(localStorage.getItem('players') || '[]');
-    const newPlayer = { ...formData, id: Date.now() };
+    const newPlayer = {
+      ...formData,
+      id: Date.now(),
+      createdAt: new Date().toISOString()
+    };
     players.push(newPlayer);
     localStorage.setItem('players', JSON.stringify(players));
     navigate('/');
@@ -28,17 +40,31 @@ function AddPlayer() {
 
   return (
     <div className="card">
-      <h1 style={{ marginBottom: '2rem' }}>Ajouter un Joueur</h1>
+      <h1 style={{ marginBottom: '1.5rem' }}>➕ Ajouter un Joueur</h1>
+
+      {error && (
+        <div style={{
+          background: '#fee',
+          color: '#c33',
+          padding: '1rem',
+          borderRadius: '8px',
+          marginBottom: '1rem',
+          fontSize: '0.9rem'
+        }}>
+          {error}
+        </div>
+      )}
+
       <form onSubmit={handleSubmit}>
         <div className="form-group">
-          <label>Nom *</label>
+          <label>Nom du joueur *</label>
           <input
             type="text"
             name="name"
             value={formData.name}
             onChange={handleChange}
-            required
             placeholder="Ex: LeBron James"
+            autoFocus
           />
         </div>
 
@@ -74,6 +100,7 @@ function AddPlayer() {
               value={formData.height}
               onChange={handleChange}
               placeholder="Ex: 203"
+              min="0"
             />
           </div>
           <div className="form-group">
@@ -83,8 +110,9 @@ function AddPlayer() {
               name="weight"
               value={formData.weight}
               onChange={handleChange}
-              step="0.1"
-              placeholder="Ex: 113.4"
+              placeholder="Ex: 113"
+              step="0.5"
+              min="0"
             />
           </div>
         </div>
@@ -99,7 +127,9 @@ function AddPlayer() {
           />
         </div>
 
-        <button type="submit" className="btn btn-primary">Ajouter le Joueur</button>
+        <button type="submit" className="btn btn-primary">
+          ✓ Ajouter le Joueur
+        </button>
       </form>
     </div>
   );
